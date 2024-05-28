@@ -216,7 +216,7 @@ class Session():
             print(f"payload_length : {payload_length}")
             if json_loaded[0] == json_loaded[1]:
                 print(f"answer is the same")
-                Session.clear_answer_slot(waid)
+                # Session.clear_answer_slot(waid)
                 return True
             else:
                 print(f"answers not the same")

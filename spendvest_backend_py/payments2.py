@@ -57,7 +57,7 @@ def register_callback_url():
         print("Response:", response.text)
      
 
-def send_user_stk(user_number, amount, menu_code):
+def send_user_stk(user_number, amount, menu_code, end_number):
     print(f"should be calling stk push")
     url = "https://sandbox.sasapay.app/api/v1/payments/request-payment/"
 
@@ -81,23 +81,23 @@ def send_user_stk(user_number, amount, menu_code):
     response = requests.post(url, headers=headers, json=body)
     if response.status_code == 200:
         print("Request successful")
-        customer_message = response.json()['CustomerMessage']
-        print("Response for customer message:", customer_message)
+        r = response.json()
+        print("Response for customer message:", r)
         # call request task
         service_description = Menu.get_menu(menu_code)
         if service_description != False:
             description = service_description['menu_description']
             RequestTask.add_request_task(user_number, menu_code, description, body)
-            Settlement.add_settlement(user_number,menu_code, amount, False)
+            Settlement.add_settlement(end_number,menu_code, amount, False, r['MerchantRequestID'])
             summary = AccountSummary.get_acc_summary(user_number)
 
             AccountSummary.update_acc_summary(user_number, {
                 'total_deposit':int(summary[b'total_deposit'].decode('utf-8')) + 1,
-                'total_settlement':int(summary[b'total_settlement'].decode('utf-8')) + 1,
+                'pending_settlement':int(summary[b'pending_settlement'].decode('utf-8')) + 1,
                 'amount_deposited':float(summary[b'amount_deposited'].decode('utf-8')) + amount
             })
 
-            return customer_message
+            return True
 
     else:
         print("Request failed")

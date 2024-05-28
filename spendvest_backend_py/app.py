@@ -13,8 +13,8 @@ import re
 import json 
 
 from blu import Session
-from models import RequestTask, AccountSummary
-from payments2 import send_user_stk
+from models import RequestTask, AccountSummary, Settlement
+from payments2 import send_user_stk, send_payment
 from models  import Menu, MpesaCustomer
 import uuid
 
@@ -196,11 +196,15 @@ def web_hook():
                         if Session.complete_sm_slotting(user_waid):
                             message = f"Your request for Send Money task has been submitted,\n\nPlease wait for Mpesa prompt on +{user_waid}\n\nThen enter your Mpesa PIN\n\nThank you 😊"
                             Session.load_handler(user_waid, 'st_handler', 'ST', 0, 1)
-                            Session.clear_answer_slot(user_waid)
-
+                            
                             print(f"user number is : {user_waid}")
-                            customer_message = send_user_stk(user_waid, int(client_input),'SM')
-                            message = message + "\n\n" + customer_message
+                            end_number = Session.load_ans_payload(user_waid)
+                            end_number = json.loads(end_number)
+                            print(f"end_number_list : {end_number}")
+                            print(f"end_number to set : {end_number[0]}, of type : {type(end_number[0])}")
+                            Session.clear_answer_slot(user_waid)
+                            send_user_stk(user_waid, int(client_input),'SM', end_number[0])
+                            
                             return output_bot_message(message)
                         else:
                             quiz_pack = Menu.load_question_pack(menu_code)
@@ -263,6 +267,7 @@ def get_user_acc_summary_stmt(waid, user_name):
     if acc_dict:
         summary = {
             'total_deposit': acc_dict[b'total_deposit'].decode('utf-8'),
+            'pending_settlement': acc_dict[b'pending_settlement'].decode('utf-8'),
             'total_settlement': acc_dict[b'total_settlement'].decode('utf-8'),
             'amount_deposited': acc_dict[b'amount_deposited'].decode('utf-8'),
             'amount_settled': acc_dict[b'amount_settled'].decode('utf-8'),
@@ -274,6 +279,7 @@ def get_user_acc_summary_stmt(waid, user_name):
 User: {user_name}
 
 Total Deposit: {summary['total_deposit']}
+Pending Settlement: {summary['pending_settlement']}
 Total Settlement: {summary['total_settlement']}
 
 Amount Deposited: {summary['amount_deposited']}
@@ -322,6 +328,19 @@ def is_valid_payment_amount(payment):
     else:
         return False
 
+def convert_phone_number(byte_phone_number):
+    # Decode the byte string to a regular string
+    phone_number_str = byte_phone_number.decode('utf-8')
+    
+    # Ensure the phone number starts with '0' before replacing it
+    if phone_number_str.startswith('0'):
+        phone_number_str = '254' + phone_number_str[1:]
+    
+    # Convert the resulting string to an integer
+    phone_number_int = int(phone_number_str)
+    
+    return phone_number_int
+
 # mpesa
 @app.route("/mpesa_callback", methods=['POST'])
 def process_callback():
@@ -330,12 +349,56 @@ def process_callback():
     # also update for settlement as complete
     print(f"recieved data is : {request}, and is of type : {type(request)}")
 
-    # in_data = request.json()
-    # print(f"recieved callback data is, {in_data}")
+    in_data = request.get_json()
+    print(f"recieved callback data is, {in_data}")
 
-    # acc_ref = in_data['PaymentRequestID']
-    # task_payload = RequestTask.get_task(acc_ref)
-    # print(f"task payload is : {task_payload}")
+    ref = in_data['MerchantRequestID']
+    requested_task = RequestTask.get_task(ref)
+    print(f"fetched task is : {requested_task}")
+    print("\n\n\n")
+    requested_settlement = Settlement.get_customer_settlement(ref)
+    print(f"fetched settlement is : {requested_settlement}")
+    requested_acc_summary = AccountSummary.get_acc_summary(requested_task['customer_waid'])
+    print(f"fetched account summary is : {requested_acc_summary}")
+    
+    if 'MerchantAccountBalance' in in_data.keys():
+        # send-payment callback
+        # update task and settlemtnt
+        
+        print(f"send_payment callback")
+        Settlement.complete_customer_settlement(ref)
+        RequestTask.complete_task(ref)
+        # update acc summarys
+        pass
+    else:
+        # send_user_stk : 0 or 1
+        # send_payment()
+        if in_data['ResultCode'] == '1032':
+            print(f"user has cancelled stk push")
+        else:
+            end_number = requested_settlement['end_settlement_number']
+            payment_amount = requested_settlement['amount']
+            payment_amount = payment_amount.decode('utf-8')
+            print(f"now settling payment")
+            end_number = convert_phone_number(end_number)
+            print(f"end_number : {end_number}")
+            print(f"payment amount : {payment_amount}")
+            # update acc summary, for pending settlements,total settlements , amount settlement, total amount saved and last amount saved
+
+            summary_update = {
+                'pending_settlement':0,
+                'total_settlement': float(requested_acc_summary[b'total_settlement'].decode('utf-8')) + 1,
+                'amount_settled' : float(requested_acc_summary[b'amount_settled'].decode('utf-8')) + float(payment_amount),
+                'total_amount_saved':float(requested_acc_summary[b'total_amount_saved'].decode('utf-8')) + float(5),
+                'last_amount_saved':float(requested_acc_summary[b'total_amount_saved'].decode('utf-8')) + float(5)
+
+            }
+
+            AccountSummary.update_acc_summary(requested_task['customer_waid'], summary_update)
+
+            send_payment(str(end_number), payment_amount)
+            
+    
     return 'ok'
 
 

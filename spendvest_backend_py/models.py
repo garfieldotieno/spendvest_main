@@ -97,6 +97,7 @@ class AccountSummary:
         summary = {
             'total_deposit':0,
             'total_settlement':0,
+            'pending_settlement':0,
             'amount_deposited':0.00,
             'amount_settled':0.00,
             'total_amount_saved':0.00,
@@ -141,25 +142,30 @@ class RequestTask:
         task = redis_client.hgetall(key)
         if task != None :
             return {
-                'uid':task[b'uid'],
-                'customer_waid':task[b'customer_waid'].decode('utf-b'),
-                'service_menu':task[b'service_menu'].decode('utf-b'),
+                # 'uid':task[b'uid'],
+                'customer_waid':task[b'customer_waid'].decode('utf-8'),
+                'service_menu':task[b'service_menu'].decode('utf-8'),
                 'service_description':task[b'service_description'].decode('utf-8'),
                 'service_payload':task[b'service_payload'].decode('utf-8'),
                 'completed':task[b'completed'].decode('utf-8'),
                 'created_at':task[b'created_at'].decode('utf-8'),
                 'updated_at':task[b'updated_at'].decode('utf-8')
             }
-            
+        
+    @staticmethod
+    def complete_task(ref):
+        key = f"request_task:{ref}"
+        return redis_client.hset(key, 'completed', 1)
+         
 
 
 
 class Settlement:
     @staticmethod
-    def add_settlement(client_waid, menu_code, amount, complete_bool):
-        uid = str(uuid.uuid4())
+    def add_settlement(client_waid, menu_code, amount, complete_bool, ref):
+        key = f"settlement:{ref}"
         current_time = time.time()
-        key = f"settlement:{uid}"
+     
         settlement = {
             'end_settlement_number' : client_waid,
             'menu_code':menu_code,
@@ -173,8 +179,18 @@ class Settlement:
         
 
     @staticmethod
-    def get_customer_settlement():
-        pass
+    def get_customer_settlement(ref):
+        key = f"settlement:{ref}"
+        set = redis_client.hgetall(key)
+        settlement = {
+            'end_settlement_number' : set[b'end_settlement_number'],
+            'menu_code': set[b'menu_code'],
+            'amount': set[b'amount'],
+            'completed':set[b'completed'],
+            'created_at':set[b'created_at'],
+            'updated_at':set[b'updated_at']
+        }
+        return settlement
 
     @staticmethod
     def complete_customer_settlement(ref):
