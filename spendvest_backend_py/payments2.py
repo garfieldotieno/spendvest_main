@@ -32,7 +32,6 @@ def get_auth_token():
     return token
 
 
-
 def register_callback_url():
     url = "https://sandbox.sasapay.app/api/v1/payments/register-ipn-url/"  # Replace with the actual URL
     
@@ -43,7 +42,7 @@ def register_callback_url():
 
     body = {
         "MerchantCode": "600980",  # Replace with the actual merchant code
-        "ConfirmationUrl": "https://cb40-102-217-172-2.ngrok-free.app/mpesa_callback"
+        "ConfirmationUrl": "https://8a80-154-127-9-221.ngrok-free.app/mpesa_callback"
     }
 
     response = requests.post(url, headers=headers, json=body)
@@ -75,7 +74,7 @@ def send_user_stk(user_number, amount, menu_code, end_number):
         "Currency": "KES",
         "Amount": amount,
         "TransactionFee": 0,
-        "CallBackURL": "https://d7d7-102-217-172-2.ngrok-free.app/mpesa_callback"
+        "CallBackURL": "https://8a80-154-127-9-221.ngrok-free.app/mpesa_callback"
     }
 
     response = requests.post(url, headers=headers, json=body)
@@ -120,7 +119,7 @@ def send_payment(receiving_number, send_amount):
     "Amount": str(send_amount),
     "ReceiverNumber": str(receiving_number),
     "Channel": "63902",
-    "CallBackURL": "https://d7d7-102-217-172-2.ngrok-free.app/mpesa_callback",
+    "CallBackURL": "https://8a80-154-127-9-221.ngrok-free.app/mpesa_callback",
     "Reason": "Test B2C"
     }
 
