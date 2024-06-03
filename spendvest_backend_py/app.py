@@ -463,6 +463,12 @@ def delete_session(session_id):
     db.session.commit()
     return jsonify({"message": "Session deleted successfully", "id": session.id}), 200
 
+
+# landing page
+@app.route('/')
+def index():
+    return 'ok'
+
 if __name__ == "__main__":
     with app.app_context():
         app.run(debug=True, port=5080)
